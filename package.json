@@ -1,0 +1,8 @@
+{
+  "name": "edubot",
+  "private": true,
+  "dependencies": {
+    "pptxgenjs": "latest",
+    "docx": "latest"
+  }
+}
