@@ -1,436 +1,237 @@
 """
-Hujjat yaratuvchi modul
-PPTX va DOCX fayllarni generatsiya qiladi
+Hujjat yaratuvchi modul - To'liq Python (node.js yo'q)
+python-pptx va python-docx kutubxonalari
 """
 
 import os
 import asyncio
-import subprocess
-import json
-import tempfile
 import logging
 from datetime import datetime
+from pptx import Presentation
+from pptx.util import Inches, Pt, Emu
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
+from pptx.util import Inches, Pt
+from docx import Document
+from docx.shared import Pt as DocPt, RGBColor as DocRGB, Inches as DocInches, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
+import tempfile
 
 logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = "/tmp/edubot_files"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+# Rang palitrasisi
+PRIMARY   = RGBColor(0x1A, 0x3C, 0x5E)
+SECONDARY = RGBColor(0x2D, 0x7D, 0xD2)
+ACCENT    = RGBColor(0xF0, 0xA5, 0x00)
+WHITE     = RGBColor(0xFF, 0xFF, 0xFF)
+LIGHT     = RGBColor(0xEA, 0xF2, 0xFB)
+DARK_TEXT = RGBColor(0x2C, 0x3E, 0x50)
+GRAY      = RGBColor(0x99, 0x99, 0x99)
+
+
+def _add_colored_background(slide, prs, color: RGBColor):
+    """Slaydi rang bilan to'ldirish"""
+    bg = slide.background
+    fill = bg.fill
+    fill.solid()
+    fill.fore_color.rgb = color
+
+
+def _add_rect(slide, prs, x, y, w, h, color: RGBColor):
+    """To'rtburchak shakl qo'shish"""
+    shape = slide.shapes.add_shape(
+        1,  # MSO_SHAPE_TYPE.RECTANGLE
+        Inches(x), Inches(y), Inches(w), Inches(h)
+    )
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = color
+    shape.line.color.rgb = color
+    return shape
+
+
+def _add_textbox(slide, text, x, y, w, h,
+                  font_size=18, bold=False, color=WHITE,
+                  align=PP_ALIGN.LEFT, wrap=True):
+    txBox = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
+    tf = txBox.text_frame
+    tf.word_wrap = wrap
+    p = tf.paragraphs[0]
+    p.alignment = align
+    run = p.add_run()
+    run.text = text
+    run.font.size = Pt(font_size)
+    run.font.bold = bold
+    run.font.color.rgb = color
+    run.font.name = "Calibri"
+    return txBox
+
 
 async def create_pptx(topic: str, content: dict) -> str:
-    """PptxGenJS yordamida prezentatsiya yaratish"""
+    """python-pptx bilan prezentatsiya yaratish"""
     safe_name = "".join(c for c in topic[:30] if c.isalnum() or c in " _-").strip()
     output_path = os.path.join(OUTPUT_DIR, f"pptx_{safe_name}_{datetime.now().strftime('%H%M%S')}.pptx")
 
-    js_code = _build_pptx_js(topic, content, output_path)
+    prs = Presentation()
+    prs.slide_width  = Inches(13.33)
+    prs.slide_height = Inches(7.5)
 
-    js_file = tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False)
-    js_file.write(js_code)
-    js_file.close()
+    blank_layout = prs.slide_layouts[6]  # blank layout
+    title_str = content.get("title", topic)
+    sections  = content.get("sections", [])
 
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "node", js_file.name,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
+    # ── 1. SARLAVHA SLAYDI ──────────────────────────────────────────
+    slide = prs.slides.add_slide(blank_layout)
+    _add_colored_background(slide, prs, PRIMARY)
+    _add_rect(slide, prs, 0, 0, 13.33, 0.12, ACCENT)
+    _add_rect(slide, prs, 0, 7.38, 13.33, 0.12, ACCENT)
 
-        if proc.returncode != 0:
-            logger.error(f"PPTX xato: {stderr.decode()}")
-            raise Exception(f"PPTX yaratish xatosi: {stderr.decode()}")
+    _add_textbox(slide, title_str, 1, 1.8, 11.33, 2.5,
+                  font_size=36, bold=True, color=WHITE,
+                  align=PP_ALIGN.CENTER)
+    _add_textbox(slide, f"Mavzu: {topic[:80]}", 1, 4.5, 11.33, 0.6,
+                  font_size=16, color=ACCENT, align=PP_ALIGN.CENTER)
+    today = datetime.now().strftime("%Y-yil, %B")
+    _add_textbox(slide, today, 1, 6.5, 11.33, 0.5,
+                  font_size=12, color=GRAY, align=PP_ALIGN.CENTER)
 
-        return output_path
-    finally:
-        os.unlink(js_file.name)
+    # ── 2. MUNDARIJA ────────────────────────────────────────────────
+    slide2 = prs.slides.add_slide(blank_layout)
+    _add_colored_background(slide2, prs, WHITE)
+    _add_rect(slide2, prs, 0, 0, 13.33, 1.2, PRIMARY)
+    _add_textbox(slide2, "📋  Mundarija", 0.5, 0.2, 12, 0.8,
+                  font_size=28, bold=True, color=WHITE)
 
+    toc_text = "\n".join(f"  {i+1}.  {s['heading']}" for i, s in enumerate(sections))
+    _add_textbox(slide2, toc_text, 0.8, 1.4, 11.5, 5.5,
+                  font_size=16, color=DARK_TEXT)
 
-def _build_pptx_js(topic: str, content: dict, output_path: str) -> str:
-    sections = content.get("sections", [])
-    title = content.get("title", topic)
-
-    # Rang palitrasini tanlash
-    palette = {
-        "primary": "1A3C5E",    # To'q ko'k
-        "secondary": "2D7DD2",  # Yorqin ko'k
-        "accent": "F0A500",     # Oltin
-        "light": "EAF2FB",      # Och ko'k
-        "white": "FFFFFF",
-        "dark": "1A1A2E",
-        "text": "2C3E50",
-    }
-
-    slides_js = []
-
-    # 1. TITLE SLIDE
-    slides_js.append(f"""
-    // ===== SARLAVHA SLAYDI =====
-    let slide1 = pres.addSlide();
-    slide1.background = {{ color: "{palette['primary']}" }};
-    
-    // Yuqori dekoratsiya
-    slide1.addShape(pres.shapes.RECTANGLE, {{
-        x: 0, y: 0, w: 10, h: 0.08,
-        fill: {{ color: "{palette['accent']}" }}, line: {{ color: "{palette['accent']}" }}
-    }});
-    
-    // Pastki dekoratsiya
-    slide1.addShape(pres.shapes.RECTANGLE, {{
-        x: 0, y: 5.545, w: 10, h: 0.08,
-        fill: {{ color: "{palette['accent']}" }}, line: {{ color: "{palette['accent']}" }}
-    }});
-    
-    // Fon shakli
-    slide1.addShape(pres.shapes.ROUNDED_RECTANGLE, {{
-        x: 0.5, y: 1.0, w: 9, h: 3.2,
-        fill: {{ color: "{palette['secondary']}", transparency: 85 }},
-        line: {{ color: "{palette['secondary']}", width: 1.5, transparency: 60 }},
-        rectRadius: 0.15
-    }});
-    
-    // Sarlavha
-    slide1.addText({json.dumps(title)}, {{
-        x: 0.7, y: 1.3, w: 8.6, h: 1.8,
-        fontSize: 36, bold: true, color: "{palette['white']}",
-        align: "center", valign: "middle",
-        fontFace: "Calibri", wrap: true
-    }});
-    
-    // Mavzu
-    slide1.addText("Mavzu: {topic[:60].replace(chr(34), chr(39))}", {{
-        x: 0.7, y: 3.2, w: 8.6, h: 0.5,
-        fontSize: 16, color: "{palette['accent']}",
-        align: "center", fontFace: "Calibri"
-    }});
-    
-    // Sana
-    let today = new Date().toLocaleDateString('uz-UZ', {{year:'numeric', month:'long', day:'numeric'}});
-    slide1.addText(today, {{
-        x: 0.7, y: 4.8, w: 8.6, h: 0.4,
-        fontSize: 12, color: "AABBCC",
-        align: "center", fontFace: "Calibri"
-    }});
-    """)
-
-    # 2. MUNDARIJA SLAYDI
-    toc_items = [s["heading"] for s in sections]
-    toc_bullets = []
-    for i, item in enumerate(toc_items, 1):
-        toc_bullets.append(f'{{ text: "{i}. {item}", options: {{ bullet: false, breakLine: true, fontSize: 16, color: "{palette["text"]}" }} }}')
-
-    slides_js.append(f"""
-    // ===== MUNDARIJA =====
-    let slide_toc = pres.addSlide();
-    slide_toc.background = {{ color: "{palette['white']}" }};
-    
-    // Header bg
-    slide_toc.addShape(pres.shapes.RECTANGLE, {{
-        x: 0, y: 0, w: 10, h: 1.1,
-        fill: {{ color: "{palette['primary']}" }}, line: {{ color: "{palette['primary']}" }}
-    }});
-    
-    slide_toc.addText("📋 Mundarija", {{
-        x: 0.5, y: 0.15, w: 9, h: 0.8,
-        fontSize: 28, bold: true, color: "{palette['white']}",
-        fontFace: "Calibri", align: "left"
-    }});
-    
-    slide_toc.addText([{", ".join(toc_bullets)}], {{
-        x: 0.8, y: 1.3, w: 8.4, h: 4,
-        fontSize: 16, color: "{palette['text']}",
-        fontFace: "Calibri", valign: "top",
-        paraSpaceAfter: 8
-    }});
-    """)
-
-    # 3. KONTENT SLAYDLARI
-    icons = ["💡", "📌", "🔬", "📊", "📖", "⭐", "🎯", "🔑"]
+    # ── 3. KONTENT SLAYDLARI ────────────────────────────────────────
+    icons = ["💡","📌","🔬","📊","📖","⭐","🎯","🔑"]
     for idx, section in enumerate(sections):
         heading = section.get("heading", f"Bo'lim {idx+1}")
-        raw_content = section.get("content", "")
-        bullet_points = [p.strip() for p in raw_content.split("||") if p.strip()]
-        if not bullet_points:
-            bullet_points = [raw_content[:200]]
+        raw    = section.get("content", "")
+        parts  = [p.strip() for p in raw.split("||") if p.strip()] or [raw[:300]]
+
+        bg = LIGHT if idx % 2 == 0 else WHITE
+        sl = prs.slides.add_slide(blank_layout)
+        _add_colored_background(sl, prs, bg)
+        _add_rect(sl, prs, 0, 0, 13.33, 1.2, PRIMARY)
 
         icon = icons[idx % len(icons)]
-        # Juft/toq slaydlar uchun ranglar
-        bg_color = palette['white'] if idx % 2 == 0 else palette['light']
+        _add_textbox(sl, f"{icon}  {heading}", 0.5, 0.18, 12, 0.85,
+                      font_size=24, bold=True, color=WHITE)
 
-        bullet_js = []
-        for bp in bullet_points[:5]:
-            safe_bp = bp.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")[:150]
-            bullet_js.append(f'{{ text: "{safe_bp}", options: {{ bullet: true, breakLine: true, fontSize: 15, color: "{palette["text"]}" }} }}')
+        bullet_text = "\n\n".join(f"  •  {p}" for p in parts[:5])
+        _add_textbox(sl, bullet_text, 0.6, 1.4, 12.1, 5.7,
+                      font_size=15, color=DARK_TEXT)
 
-        slides_js.append(f"""
-    // ===== BO'LIM: {heading[:30]} =====
-    let slide_{idx+2} = pres.addSlide();
-    slide_{idx+2}.background = {{ color: "{bg_color}" }};
-    
-    // Header
-    slide_{idx+2}.addShape(pres.shapes.RECTANGLE, {{
-        x: 0, y: 0, w: 10, h: 1.1,
-        fill: {{ color: "{palette['primary']}" }}, line: {{ color: "{palette['primary']}" }}
-    }});
-    
-    // Raqam doirasi
-    slide_{idx+2}.addShape(pres.shapes.OVAL, {{
-        x: 0.3, y: 0.2, w: 0.7, h: 0.7,
-        fill: {{ color: "{palette['accent']}" }}, line: {{ color: "{palette['accent']}" }}
-    }});
-    slide_{idx+2}.addText("{idx+1}", {{
-        x: 0.3, y: 0.2, w: 0.7, h: 0.7,
-        fontSize: 22, bold: true, color: "{palette['primary']}",
-        align: "center", valign: "middle", fontFace: "Calibri"
-    }});
-    
-    // Sarlavha
-    slide_{idx+2}.addText("{icon} {heading[:50]}", {{
-        x: 1.2, y: 0.12, w: 8.4, h: 0.9,
-        fontSize: 24, bold: true, color: "{palette['white']}",
-        fontFace: "Calibri", valign: "middle"
-    }});
-    
-    // Kontent
-    slide_{idx+2}.addText([{", ".join(bullet_js) if bullet_js else f'{{ text: "{raw_content[:200].replace(chr(34), chr(39))}", options: {{ fontSize: 15, color: "{palette["text"]}" }} }}'}], {{
-        x: 0.5, y: 1.3, w: 9, h: 3.9,
-        fontFace: "Calibri", valign: "top",
-        paraSpaceAfter: 10
-    }});
-    
-    // Pastki chiziq
-    slide_{idx+2}.addShape(pres.shapes.RECTANGLE, {{
-        x: 0, y: 5.5, w: 10, h: 0.125,
-        fill: {{ color: "{palette['secondary']}", transparency: 70 }},
-        line: {{ color: "{palette['secondary']}", transparency: 70 }}
-    }});
-    
-    // Slayd raqami
-    slide_{idx+2}.addText("{idx+2}", {{
-        x: 9.3, y: 5.3, w: 0.5, h: 0.3,
-        fontSize: 10, color: "999999", align: "center", fontFace: "Calibri"
-    }});
-    """)
+        _add_rect(sl, prs, 0, 7.3, 13.33, 0.1, SECONDARY)
+        num_box = _add_textbox(sl, str(idx + 2), 12.6, 7.1, 0.5, 0.35,
+                                font_size=10, color=GRAY, align=PP_ALIGN.CENTER)
 
-    # YAKUNIY SLAYD
-    slides_js.append(f"""
-    // ===== YAKUNIY SLAYD =====
-    let slide_end = pres.addSlide();
-    slide_end.background = {{ color: "{palette['primary']}" }};
-    
-    slide_end.addShape(pres.shapes.RECTANGLE, {{
-        x: 0, y: 0, w: 10, h: 0.08,
-        fill: {{ color: "{palette['accent']}" }}, line: {{ color: "{palette['accent']}" }}
-    }});
-    slide_end.addShape(pres.shapes.RECTANGLE, {{
-        x: 0, y: 5.545, w: 10, h: 0.08,
-        fill: {{ color: "{palette['accent']}" }}, line: {{ color: "{palette['accent']}" }}
-    }});
-    
-    slide_end.addShape(pres.shapes.ROUNDED_RECTANGLE, {{
-        x: 2, y: 1.5, w: 6, h: 2.5,
-        fill: {{ color: "{palette['secondary']}", transparency: 80 }},
-        line: {{ color: "{palette['accent']}", width: 2 }},
-        rectRadius: 0.2
-    }});
-    
-    slide_end.addText("E'tiboringiz uchun\\nrahmat! 🙏", {{
-        x: 2, y: 1.5, w: 6, h: 2.5,
-        fontSize: 32, bold: true, color: "{palette['white']}",
-        align: "center", valign: "middle",
-        fontFace: "Calibri"
-    }});
-    """)
+    # ── 4. YAKUNIY SLAYD ────────────────────────────────────────────
+    end = prs.slides.add_slide(blank_layout)
+    _add_colored_background(end, prs, PRIMARY)
+    _add_rect(end, prs, 0, 0, 13.33, 0.12, ACCENT)
+    _add_rect(end, prs, 0, 7.38, 13.33, 0.12, ACCENT)
+    _add_textbox(end, "E'tiboringiz uchun\nrahmat! 🙏", 1.5, 2.2, 10, 3,
+                  font_size=38, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
 
-    all_slides = "\n".join(slides_js)
-
-    return f"""
-const pptxgen = require("pptxgenjs");
-
-async function createPresentation() {{
-    let pres = new pptxgen();
-    pres.layout = 'LAYOUT_16x9';
-    pres.title = {json.dumps(title)};
-    pres.author = 'EduBot';
-
-{all_slides}
-
-    await pres.writeFile({{ fileName: {json.dumps(output_path)} }});
-    console.log("✅ Tayyor:", {json.dumps(output_path)});
-}}
-
-createPresentation().catch(err => {{
-    console.error("❌ Xato:", err);
-    process.exit(1);
-}});
-"""
+    prs.save(output_path)
+    logger.info(f"✅ PPTX tayyor: {output_path}")
+    return output_path
 
 
 async def create_docx(topic: str, content: dict, doc_type: str) -> str:
-    """docx-js yordamida Word hujjat yaratish"""
+    """python-docx bilan Word hujjat yaratish"""
     safe_name = "".join(c for c in topic[:30] if c.isalnum() or c in " _-").strip()
     output_path = os.path.join(OUTPUT_DIR, f"docx_{safe_name}_{datetime.now().strftime('%H%M%S')}.docx")
 
-    js_code = _build_docx_js(topic, content, doc_type, output_path)
+    doc = Document()
 
-    js_file = tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False)
-    js_file.write(js_code)
-    js_file.close()
-
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "node", js_file.name,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
-
-        if proc.returncode != 0:
-            logger.error(f"DOCX xato: {stderr.decode()}")
-            raise Exception(f"DOCX yaratish xatosi: {stderr.decode()}")
-
-        return output_path
-    finally:
-        os.unlink(js_file.name)
-
-
-def _build_docx_js(topic: str, content: dict, doc_type: str, output_path: str) -> str:
-    sections = content.get("sections", [])
-    title = content.get("title", topic)
+    # ── Sahifa o'lchamlari (A4) ──────────────────────────────────────
+    section = doc.sections[0]
+    section.page_width  = Cm(21)
+    section.page_height = Cm(29.7)
+    section.left_margin   = Cm(3)
+    section.right_margin  = Cm(1.5)
+    section.top_margin    = Cm(2)
+    section.bottom_margin = Cm(2)
 
     doc_type_names = {
         "mustaqil": "MUSTAQIL ISH",
-        "amaliy": "AMALIY ISH",
-        "referat": "REFERAT",
+        "amaliy":   "AMALIY ISH",
+        "referat":  "REFERAT",
     }
     doc_type_name = doc_type_names.get(doc_type, "HUJJAT")
+    title_str = content.get("title", topic)
+    sections  = content.get("sections", [])
 
-    # Sections JS kodini qurish
-    sections_code = []
-    for section in sections:
-        heading = section.get("heading", "Bo'lim").replace("\\", "\\\\").replace('"', '\\"')
-        body = section.get("content", "").replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    # ── Sarlavha sahifasi ────────────────────────────────────────────
+    def center_bold(text, size=14, color=None, space_before=0, space_after=6):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        pf = p.paragraph_format
+        pf.space_before = DocPt(space_before)
+        pf.space_after  = DocPt(space_after)
+        run = p.add_run(text)
+        run.bold = True
+        run.font.size = DocPt(size)
+        run.font.name = "Times New Roman"
+        if color:
+            run.font.color.rgb = DocRGB(*color)
+        return p
 
-        sections_code.append(f"""
-        new Paragraph({{
-            children: [new TextRun({{ text: "{heading}", bold: true, size: 28, font: "Times New Roman" }})],
-            heading: HeadingLevel.HEADING_1,
-            spacing: {{ before: 300, after: 150 }}
-        }}),
-        new Paragraph({{
-            children: [new TextRun({{ text: "{body}", size: 24, font: "Times New Roman" }})],
-            spacing: {{ before: 0, after: 200, line: 360 }},
-            indent: {{ firstLine: 720 }},
-            alignment: AlignmentType.JUSTIFIED
-        }}),""")
+    center_bold("O'ZBEKISTON RESPUBLIKASI OLIY TA'LIM VAZIRLIGI", 12, space_before=40)
+    center_bold(doc_type_name, 18, color=(0x1A, 0x3C, 0x5E), space_before=30, space_after=10)
 
-    all_sections = "\n".join(sections_code)
+    p_mavzu = doc.add_paragraph()
+    p_mavzu.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r1 = p_mavzu.add_run("Mavzu: ")
+    r1.font.size = DocPt(14)
+    r1.font.name = "Times New Roman"
+    r2 = p_mavzu.add_run(title_str)
+    r2.bold = True
+    r2.font.size = DocPt(14)
+    r2.font.name = "Times New Roman"
 
-    return f"""
-const {{ Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel,
-        Header, Footer, PageNumber, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType }} = require("docx");
-const fs = require("fs");
+    center_bold(f"{datetime.now().year}-yil", 12, space_before=80)
 
-async function createDocument() {{
-    const doc = new Document({{
-        styles: {{
-            default: {{
-                document: {{
-                    run: {{ font: "Times New Roman", size: 24 }}
-                }}
-            }},
-            paragraphStyles: [
-                {{
-                    id: "Heading1",
-                    name: "Heading 1",
-                    basedOn: "Normal",
-                    next: "Normal",
-                    quickFormat: true,
-                    run: {{ size: 28, bold: true, font: "Times New Roman", color: "1A3C5E" }},
-                    paragraph: {{
-                        spacing: {{ before: 300, after: 150 }},
-                        outlineLevel: 0
-                    }}
-                }}
-            ]
-        }},
-        sections: [{{
-            properties: {{
-                page: {{
-                    size: {{ width: 11906, height: 16838 }},
-                    margin: {{ top: 1440, right: 1008, bottom: 1440, left: 1728 }}
-                }}
-            }},
-            headers: {{
-                default: new Header({{
-                    children: [
-                        new Paragraph({{
-                            children: [new TextRun({{ text: "O'zbekiston Respublikasi ta'lim tizimi", size: 18, font: "Times New Roman", color: "666666" }})],
-                            alignment: AlignmentType.CENTER,
-                            border: {{ bottom: {{ style: BorderStyle.SINGLE, size: 3, color: "CCCCCC", space: 1 }} }}
-                        }})
-                    ]
-                }})
-            }},
-            footers: {{
-                default: new Footer({{
-                    children: [
-                        new Paragraph({{
-                            children: [
-                                new TextRun({{ text: "Sahifa: ", size: 18, font: "Times New Roman", color: "666666" }}),
-                                new PageNumber()
-                            ],
-                            alignment: AlignmentType.CENTER,
-                            border: {{ top: {{ style: BorderStyle.SINGLE, size: 3, color: "CCCCCC", space: 1 }} }}
-                        }})
-                    ]
-                }})
-            }},
-            children: [
-                // Sarlavha sahifasi
-                new Paragraph({{
-                    children: [new TextRun({{ text: "", size: 24 }})],
-                    spacing: {{ before: 600 }}
-                }}),
-                new Paragraph({{
-                    children: [new TextRun({{ text: "{doc_type_name}", bold: true, size: 32, font: "Times New Roman", color: "1A3C5E" }})],
-                    alignment: AlignmentType.CENTER,
-                    spacing: {{ before: 400, after: 200 }}
-                }}),
-                new Paragraph({{
-                    children: [new TextRun({{ text: "Mavzu:", bold: true, size: 24, font: "Times New Roman" }})],
-                    alignment: AlignmentType.CENTER,
-                    spacing: {{ before: 200 }}
-                }}),
-                new Paragraph({{
-                    children: [new TextRun({{ text: {json.dumps(title)}, bold: true, size: 28, font: "Times New Roman" }})],
-                    alignment: AlignmentType.CENTER,
-                    spacing: {{ before: 100, after: 600 }}
-                }}),
-                new Paragraph({{
-                    children: [new TextRun({{ text: new Date().getFullYear() + "-yil", size: 24, font: "Times New Roman" }})],
-                    alignment: AlignmentType.CENTER,
-                    spacing: {{ before: 800 }}
-                }}),
-                
-                // Sahifa kesimi
-                new Paragraph({{
-                    children: [{{ type: "pageBreak" }}],
-                    pageBreakBefore: true
-                }}),
-                
-                // Asosiy kontent
-                {all_sections}
-            ]
-        }}]
-    }});
+    doc.add_page_break()
 
-    const buffer = await Packer.toBuffer(doc);
-    fs.writeFileSync({json.dumps(output_path)}, buffer);
-    console.log("✅ Tayyor:", {json.dumps(output_path)});
-}}
+    # ── Asosiy kontent ───────────────────────────────────────────────
+    for section_data in sections:
+        heading = section_data.get("heading", "Bo'lim")
+        body    = section_data.get("content", "")
 
-createDocument().catch(err => {{
-    console.error("❌ Xato:", err.message);
-    process.exit(1);
-}});
-"""
+        # Sarlavha
+        h = doc.add_heading(heading, level=1)
+        h.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        for run in h.runs:
+            run.font.name  = "Times New Roman"
+            run.font.size  = DocPt(14)
+            run.font.color.rgb = DocRGB(0x1A, 0x3C, 0x5E)
+
+        # Body — paragraflar
+        for para_text in body.split("\n"):
+            para_text = para_text.strip()
+            if not para_text:
+                continue
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            pf = p.paragraph_format
+            pf.first_line_indent = Cm(1.25)
+            pf.space_after  = DocPt(6)
+            pf.line_spacing = DocPt(18)
+            run = p.add_run(para_text)
+            run.font.size = DocPt(14)
+            run.font.name = "Times New Roman"
+
+    doc.save(output_path)
+    logger.info(f"✅ DOCX tayyor: {output_path}")
+    return output_path
