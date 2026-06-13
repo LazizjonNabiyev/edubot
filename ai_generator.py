@@ -90,56 +90,93 @@ class AIGenerator:
         type_instructions = {
             "pptx": f"""Mavzu bo'yicha prezentatsiya uchun kontent tayyorla.
 FAQAT JSON format, boshqa hech narsa yozma.
-{{
-  "title": "Sarlavha",
-  "sections": [
-    {{"heading": "Kirish", "content": "2-3 ta asosiy fikr, har biridan keyin || belgisi. Masalan: Fikr 1 || Fikr 2 || Fikr 3"}},
-    {{"heading": "Asosiy qism 1", "content": "..."}},
-    {{"heading": "Asosiy qism 2", "content": "..."}},
-    {{"heading": "Asosiy qism 3", "content": "..."}},
-    {{"heading": "Xulosa", "content": "..."}}
-  ]
-}}
-Har bir bo'lim 3-5 ta qisqa fikrdan iborat bo'lsin. || bilan ajrat.""",
 
-            "mustaqil": f"""Mustaqil ish uchun kontent tayyorla.
-FAQAT JSON format:
-{{
-  "title": "Sarlavha",
-  "sections": [
-    {{"heading": "Kirish", "content": "To'liq paragraf matn..."}},
-    {{"heading": "Asosiy qism", "content": "..."}},
-    {{"heading": "Tahlil va muhokama", "content": "..."}},
-    {{"heading": "Xulosa", "content": "..."}},
-    {{"heading": "Foydalanilgan adabiyotlar", "content": "1. ...\n2. ...\n3. ..."}}
-  ]
-}}
-Har bo'lim 200-300 so'zdan iborat bo'lsin. O'zbek tilida.""",
+MUHIM QOIDALAR:
+- Har bir "content" da kamida 5-7 ta fikr bo'lsin
+- Har bir fikr 1-2 jumladan iborat bo'lsin (qisqa emas, ma'lumotli)
+- Fikrlar orasida || belgisi bo'lsin
+- Raqam, statistika, misol keltir
+- O'zbek tilida yoz
 
-            "amaliy": f"""Amaliy ish uchun kontent tayyorla.
-FAQAT JSON format:
 {{
-  "title": "Sarlavha",
+  "title": "{topic}",
   "sections": [
-    {{"heading": "Kirish va maqsad", "content": "..."}},
-    {{"heading": "Nazariy asos", "content": "..."}},
-    {{"heading": "Amaliy qism", "content": "..."}},
-    {{"heading": "Natijalar va tahlil", "content": "..."}},
-    {{"heading": "Xulosa", "content": "..."}}
+    {{
+      "heading": "Kirish: Mavzuga umumiy nazar",
+      "content": "Bu mavzu haqida 1-2 jumlali fikr || Tarixiy kelib chiqishi || Nima uchun dolzarb || Qanday sohalarda qo'llaniladi || Asosiy muammo va yechimlar || Dunyo miqyosidagi ahamiyati"
+    }},
+    {{
+      "heading": "Asosiy tushunchalar va ta'riflar",
+      "content": "Birinchi asosiy tushuncha va uning izohi || Ikkinchi muhim atama || Uchinchi tushuncha batafsil || To'rtinchi element || Beshinchi jihat || Oltinchi xususiyat"
+    }},
+    {{
+      "heading": "Qo'llanish sohalari va misollari",
+      "content": "Birinchi soha: batafsil misol || Ikkinchi soha: amaliy tatbiq || Uchinchi soha: real hayot misoli || To'rtinchi soha || Beshinchi qo'llanish || Jahon tajribasi"
+    }},
+    {{
+      "heading": "Afzalliklari va kamchiliklari",
+      "content": "Birinchi afzallik: batafsil || Ikkinchi ijobiy tomoni || Uchinchi yaxshi jihati || Birinchi kamchilik || Ikkinchi muammo || Yechim yo'llari"
+    }},
+    {{
+      "heading": "Zamonaviy tendentsiyalar",
+      "content": "Hozirgi holat || Rivojlanish tendentsiyasi || Yangi kashfiyotlar || Kelajak istiqboli || Texnologik o'zgarishlar || 2030-2050 yillar prognozi"
+    }},
+    {{
+      "heading": "Xulosa va tavsiyalar",
+      "content": "Asosiy xulosalar || Amaliy tavsiyalar || O'zbek uchun ahamiyati || Keyingi qadamlar || Umumiy baholash || So'nggi fikr"
+    }}
   ]
 }}""",
 
-            "referat": f"""Referat uchun kontent tayyorla.
-FAQAT JSON format:
+            "mustaqil": f"""Mustaqil ish uchun professional akademik kontent tayyorla.
+FAQAT JSON format, boshqa hech narsa yozma.
+
+MUHIM: Har bir bo'lim kamida 250-350 so'zdan iborat bo'lsin. To'liq jumlalar bilan yoz.
+
 {{
-  "title": "Sarlavha",
+  "title": "{topic}",
   "sections": [
-    {{"heading": "Kirish", "content": "..."}},
-    {{"heading": "Mavzuning tarixiy taraqqiyoti", "content": "..."}},
-    {{"heading": "Asosiy qism: {topic[:50]}", "content": "..."}},
-    {{"heading": "Zamonaviy holat va tendentsiyalar", "content": "..."}},
-    {{"heading": "Xulosa", "content": "..."}},
-    {{"heading": "Adabiyotlar ro'yxati", "content": "1. ...\n2. ...\n3. ..."}}
+    {{"heading": "Kirish", "content": "Mavzuning dolzarbligi va ahamiyati haqida 3-4 ta to'liq jumla. Muammo bayoni. Ishning maqsad va vazifalari. Tadqiqot metodlari. Ishning tuzilishi haqida qisqacha ma'lumot. Mavzuning O'zbekiston uchun ahamiyati."}},
+    {{"heading": "Mavzuning nazariy asoslari", "content": "Asosiy tushunchalar va ilmiy ta'riflar batafsil keltiriladi. Turli olimlar va mutaxassislarning qarashlari. Mavzuning tarixiy rivojlanishi. Nazariy asoslar va metodologiya. Xorijiy va mahalliy tadqiqotchilar ishlari."}},
+    {{"heading": "Asosiy tahlil va muhokama", "content": "Mavzuning asosiy jihatlari chuqur tahlil qilinadi. Turli yondashuvlar solishtirma tahlil qilinadi. Muammoning sabablari va oqibatlari. Amaliy misollar va statistik ma'lumotlar. O'zbekiston sharoitida tahlil."}},
+    {{"heading": "Amaliy ahamiyati va qo'llanilishi", "content": "Mavzuning amaliy hayotda qo'llanilishi. Iqtisodiy, ijtimoiy va madaniy ahamiyati. Sohadagi muammolar va yechim yo'llari. Kelajak rivojlanish istiqbollari. Tavsiyalar va takliflar."}},
+    {{"heading": "Xulosa", "content": "Barcha asosiy fikrlar qisqa xulosasi. Tadqiqot natijalari. Amaliy tavsiyalar. Kelajak tadqiqotlar uchun yo'nalishlar. Mavzuning umumiy baholash."}},
+    {{"heading": "Foydalanilgan adabiyotlar", "content": "1. Karimov I.A. O'zbekiston XXI asr bo'sag'asida. — T.: O'zbekiston, 1997.\n2. Mirziyoyev Sh.M. Erkin va farovon, demokratik O'zbekiston davlatini birgalikda barpo etamiz. — T.: 2016.\n3. [Mavzu bo'yicha xorijiy manba]. — Moskva: Nauka, 2020.\n4. [Mavzu bo'yicha o'zbek muallifli manba]. — Toshkent: Fan, 2021.\n5. [Elektron manba]: www.ziyonet.uz"}}
+  ]
+}}""",
+
+            "amaliy": f"""Amaliy ish uchun professional kontent tayyorla.
+FAQAT JSON format, boshqa hech narsa yozma.
+
+MUHIM: Har bir bo'lim 200-300 so'zdan iborat, to'liq jumlalar bilan.
+
+{{
+  "title": "{topic}",
+  "sections": [
+    {{"heading": "Ishning maqsadi va vazifalari", "content": "Amaliy ishning asosiy maqsadi. Qo'yilgan vazifalar ro'yxati va har birining izohi. Kutilgan natijalar. Tadqiqot ob'ekti va predmeti. Ishning amaliy ahamiyati."}},
+    {{"heading": "Nazariy asos", "content": "Mavzu bo'yicha asosiy nazariy ma'lumotlar. Ilmiy ta'riflar va tushunchalar. Mavjud metodlar va yondashuvlar. Xorijiy va mahalliy tadqiqotlar natijalari. Nazariy asoslanish."}},
+    {{"heading": "Ishlatilgan metodlar va vositalar", "content": "Qo'llangan tadqiqot metodlari batafsil. Asbob-uskunalar va vositalar. Eksperiment yoki kuzatuv sharoitlari. Ma'lumotlar to'plash usullari. Tahlil metodologiyasi."}},
+    {{"heading": "Amaliy qism: bajarilgan ishlar", "content": "Birinchi bosqich bajarilishi. Ikkinchi bosqich natijalari. Olingan ma'lumotlar tahlili. Jadvallar va grafiklar izohi. Kutilgan va real natijalar solishtirmasi."}},
+    {{"heading": "Natijalar tahlili va muhokama", "content": "Olingan natijalarning tahlili. Musbat va manfiy tomonlar. Xatolar va ularning sabablari. Takomillashtirish yo'llari. Natijalarning amaliy ahamiyati."}},
+    {{"heading": "Xulosa va tavsiyalar", "content": "Asosiy xulosalar. Maqsadga erishilganlik darajasi. Amaliy tavsiyalar. Keyingi tadqiqotlar uchun yo'nalishlar. Umumiy baholash."}}
+  ]
+}}""",
+
+            "referat": f"""Referat uchun professional akademik kontent tayyorla.
+FAQAT JSON format, boshqa hech narsa yozma.
+
+MUHIM: Har bir bo'lim 250-400 so'zdan iborat, professional uslubda.
+
+{{
+  "title": "{topic}",
+  "sections": [
+    {{"heading": "Kirish", "content": "Mavzuning dolzarbligi va zamonaviy ahamiyati. Tadqiqot maqsadi va vazifalari. Mavzu bo'yicha ilmiy ishlar ko'rib chiqilishi. Ishning tuzilishi haqida ma'lumot. Metodologik asos."}},
+    {{"heading": "Mavzuning tarixiy taraqqiyoti", "content": "Mavzuning paydo bo'lishi va rivojlanish tarixi. Turli davrlarda munosabat. Muhim kashfiyotlar va burilish nuqtalar. Taniqli olimlar va ularning hissasi. Rivojlanish bosqichlari."}},
+    {{"heading": "{topic[:60]} mohiyati va xususiyatlari", "content": "Asosiy tushunchalar va ilmiy ta'riflar. Mohiyati va xarakterli belgilari. Turlari va tasnifi. Boshqa tushunchalar bilan bog'liqligi. Zamonaviy ta'riflar."}},
+    {{"heading": "Zamonaviy holat va tendentsiyalar", "content": "Hozirgi vaqtdagi holat tahlili. Rivojlangan davlatlar tajribasi. O'zbekistondagi holat. Yangi tendentsiyalar va yo'nalishlar. Raqamli ma'lumotlar va statistika."}},
+    {{"heading": "Muammo va yechim yo'llari", "content": "Mavjud muammolar tahlili. Hal qilinmagan masalalar. Xorijiy tajriba va yechimlar. O'zbekiston uchun tavsiyalar. Kelajak istiqbollari."}},
+    {{"heading": "Xulosa", "content": "Asosiy xulosalar bayoni. Tadqiqot natijalari. Amaliy ahamiyati. Kelajak tadqiqotlar uchun tavsiyalar. Umumiy baholash."}},
+    {{"heading": "Adabiyotlar ro'yxati", "content": "1. Mirziyoyev Sh.M. Yangi O'zbekiston strategiyasi. — T.: 2021.\n2. [Mavzu muallifi]. [Kitob nomi]. — Toshkent: Fan, 2022.\n3. [Xorijiy muallif]. [Xorijiy manba]. — Moskva, 2020.\n4. [Dissertatsiya yoki ilmiy maqola]. — T.: 2023.\n5. Elektron manba: www.edu.uz"}}
   ]
 }}"""
         }
